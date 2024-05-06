@@ -3,6 +3,12 @@
 *.d.ts
 node_modules
 
+# ssh key
+*.pem
+
+# env
+.env
+
 # CDK asset staging directory
 .cdk.staging
 cdk.out
