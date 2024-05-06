@@ -2,6 +2,8 @@ import { CfnOutput, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib'
 import { Construct } from 'constructs';
 // ec2 に関するパッケージを import
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+// 自作コンストラクトを import
+import { EC2ServerInstance } from './constructs/ec2-server-instance';
 
 export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
@@ -41,7 +43,6 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
       value: `aws ssm get-parameter --name /ec2/keypair/${cfnKeyPair.getAtt('KeyPairId')} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
     })
 
-    // EC2 インスタンス(Web Server)の作成
     // Web Serverのセキュリティグループを作成
     const webServerSecurityGroup = new ec2.SecurityGroup(this, 'WebServerSecurityGroup', {
       vpc: vpc,
@@ -52,20 +53,6 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
     webServerSecurityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Allow HTTP traffic from anywhere');
     webServerSecurityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow SSH traffic from anywhere');
 
-    // Web Serverのインスタンスを作成
-    const webServer = new ec2.Instance(this, 'WebServer', {
-      instanceName: 'WEBサーバー',
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
-      machineImage: new ec2.AmazonLinuxImage({ generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023 }),
-      vpc: vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PUBLIC,
-      },
-      securityGroup: webServerSecurityGroup,
-      keyName: cfnKeyPair.ref,
-    });
-
-    // EC2 インスタンス(DB server)の作成
     // DB serverのセキュリティグループを作成
     const dbServerSecurityGroup = new ec2.SecurityGroup(this, 'DBServerSecurityGroup', {
       vpc: vpc,
@@ -80,17 +67,23 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
     // ICMPのポートを開放(Web Serverからのアクセスのみを許可)
     dbServerSecurityGroup.addIngressRule(webServerSecurityGroup, ec2.Port.icmpPing(), 'Allow ICMP traffic from Web Server');
 
-    // DB serverのインスタンスを作成
-    const dbServer = new ec2.Instance(this, 'DBServer', {
-      instanceName: 'DBサーバー',
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
-      machineImage: new ec2.AmazonLinuxImage({ generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023 }),
+    
+    // Web Serverのインスタンスを作成
+    new EC2ServerInstance(this, 'WebServer', {
       vpc: vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
+      instanceName: 'WEBサーバー',
+      subnetType: ec2.SubnetType.PUBLIC,
+      securityGroup: webServerSecurityGroup,
+      keyName: cfnKeyPair.keyName,
+    });
+
+    // DB serverのインスタンスを作成
+    new EC2ServerInstance(this, 'DBServer', {
+      vpc: vpc,
+      instanceName: 'DBサーバー',
+      subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       securityGroup: dbServerSecurityGroup,
-      keyName: cfnKeyPair.ref,
+      keyName: cfnKeyPair.keyName,
     });
   }
 }
