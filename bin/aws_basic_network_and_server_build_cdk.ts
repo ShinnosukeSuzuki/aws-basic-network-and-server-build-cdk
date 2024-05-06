@@ -4,3 +4,6 @@ import { AwsBasicNetworkAndServerBuildCdkStack } from '../lib/aws_basic_network_
 
 const app = new cdk.App();
 new AwsBasicNetworkAndServerBuildCdkStack(app, 'AwsBasicNetworkAndServerBuildCdkStack');
+
+// stackに対してタグを設定
+cdk.Tags.of(app).add('StackName', 'AwsBasicNetworkAndServerBuildCdkStack');
