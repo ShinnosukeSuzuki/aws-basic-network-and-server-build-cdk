@@ -30,8 +30,16 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
       ],
     });
 
-    // コンソール画面から既に作成しているEC2のキーペア(my-key)を取得
-    const keyPair = ec2.KeyPair.fromKeyPairName(this, 'KeyPair', 'my-key');
+    // キーペア作成
+    const cfnKeyPair = new ec2.CfnKeyPair(this, 'CfnKeyPair', {
+      keyName: 'key-pair-by-cdk',
+    })
+    cfnKeyPair.applyRemovalPolicy(RemovalPolicy.DESTROY)
+
+    // キーペア取得コマンドアウトプット
+    new CfnOutput(this, 'GetSSHKeyCommand', {
+      value: `aws ssm get-parameter --name /ec2/keypair/${cfnKeyPair.getAtt('KeyPairId')} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
+    })
 
     // EC2 インスタンス(Web Server)の作成
     // Web Serverのセキュリティグループを作成
@@ -54,7 +62,7 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
         subnetType: ec2.SubnetType.PUBLIC,
       },
       securityGroup: webServerSecurityGroup,
-      keyPair: keyPair,
+      keyName: cfnKeyPair.ref,
     });
 
     // EC2 インスタンス(DB server)の作成
@@ -82,7 +90,7 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
         subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
       securityGroup: dbServerSecurityGroup,
-      keyPair: keyPair,
+      keyName: cfnKeyPair.ref,
     });
   }
 }
