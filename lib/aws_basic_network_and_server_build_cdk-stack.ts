@@ -30,6 +30,9 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
       ],
     });
 
+    // コンソール画面から既に作成しているEC2のキーペア(my-key)を取得
+    const keyPair = ec2.KeyPair.fromKeyPairName(this, 'KeyPair', 'my-key');
+
     // EC2 インスタンス(Web Server)の作成
     // Web Serverのセキュリティグループを作成
     const webServerSecurityGroup = new ec2.SecurityGroup(this, 'WebServerSecurityGroup', {
@@ -51,7 +54,35 @@ export class AwsBasicNetworkAndServerBuildCdkStack extends Stack {
         subnetType: ec2.SubnetType.PUBLIC,
       },
       securityGroup: webServerSecurityGroup,
-      keyPair: ec2.KeyPair.fromKeyPairName(this, 'KeyPair', 'my-key'),
+      keyPair: keyPair,
+    });
+
+    // EC2 インスタンス(DB server)の作成
+    // DB serverのセキュリティグループを作成
+    const dbServerSecurityGroup = new ec2.SecurityGroup(this, 'DBServerSecurityGroup', {
+      vpc: vpc,
+      securityGroupName: 'DB-SG',
+    });
+
+    // DB serverのセキュリティグループにインバウンドルールを追加
+    // MariaDB(MySQL)のポートを開放(Web Serverからのアクセスのみを許可)
+    dbServerSecurityGroup.addIngressRule(webServerSecurityGroup, ec2.Port.tcp(3306), 'Allow MySQL traffic from Web Server');
+    // SSHのポートを開放(Web Serverからのアクセスのみを許可)
+    dbServerSecurityGroup.addIngressRule(webServerSecurityGroup, ec2.Port.tcp(22), 'Allow SSH traffic from Web Server');
+    // ICMPのポートを開放(Web Serverからのアクセスのみを許可)
+    dbServerSecurityGroup.addIngressRule(webServerSecurityGroup, ec2.Port.icmpPing(), 'Allow ICMP traffic from Web Server');
+
+    // DB serverのインスタンスを作成
+    const dbServer = new ec2.Instance(this, 'DBServer', {
+      instanceName: 'DBサーバー',
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
+      machineImage: new ec2.AmazonLinuxImage({ generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023 }),
+      vpc: vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroup: dbServerSecurityGroup,
+      keyPair: keyPair,
     });
   }
 }
