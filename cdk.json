@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --prefer-ts-exts bin/aws_basic_network_and_server_build_cdk.ts",
+  "app": "npx ts-node --prefer-ts-exts bin/aws-basic-network-and-server-build-cdk.ts",
   "watch": {
     "include": [
       "**"
